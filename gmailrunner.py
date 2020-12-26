@@ -1,8 +1,8 @@
-import summarize
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import metadata_parser
 import email.header
+import summarize
 import requests
 import datetime
 import argparse
@@ -23,12 +23,12 @@ gmail_folder = "INBOX"
 start_time = time.time()
 gmail_tags_path = 'gmailrunner.tags'
 master_tags = set()
-master_dict = {}
-url_blacklist = [                                               # This is a `contains` blacklist, non-explicit
+output_dict = {}
+url_block_list = [          # This is a `contains` block-list, non-explicit
     'https://myaccount.google.com/notifications',
     'https://accounts.google.com/AccountChooser',
 ]
-sender_whitelist = [
+sender_allow_list = [
     'email_address_@_to_ignore.com',
     'other_address_@_to_ignore.com',
     'etc@you_get_it.com',
@@ -63,7 +63,8 @@ def build_url_obj(_url):
             url_obj['site_name'] = page.get_metadatas('site_name', strategy=meta_strategy)
         if page and url_obj['image']:
             url_obj['image'].add(page.get_metadata_link('image'))
-    except Exception:
+    except Exception as e:
+        logging.warning(e)
         pass
 
     response = requests.get(_url)
@@ -122,7 +123,7 @@ def gmail_authorize(gmail_service):
 
 
 def process_mailbox(_gmail_service):
-    global url_blacklist, sender_whitelist, master_dict
+    global url_block_list, sender_allow_list, output_dict
     _return_value, _data = _gmail_service.search(None, "ALL")
     if _return_value != 'OK':
         logging.warning('[!] No messages found!\n')
@@ -143,16 +144,16 @@ def process_mailbox(_gmail_service):
                         for url in url_list:
                             is_blacklisted = 0
                             sender_approved = 0
-                            for ignore_url in url_blacklist:
+                            for ignore_url in url_block_list:
                                 if ignore_url in url:
                                     is_blacklisted = 1
-                            for sender in sender_whitelist:
+                            for sender in sender_allow_list:
                                 if sender in email_from:
                                     sender_approved = 1
-                            if url not in master_dict and url not in url_blacklist:
+                            if url not in output_dict and url not in url_block_list:
                                 if is_blacklisted == 0 and sender_approved == 1:
                                     url_obj = build_url_obj(url)
-                                    master_dict[url] = url_obj
+                                    output_dict[url] = url_obj
 
 
 def parse_email_list(gmail_service):
@@ -175,13 +176,13 @@ def summarize_url_content(_url):
 
 
 def main():
-    global start_time, gmail_folder, master_dict
+    global start_time, gmail_folder, output_dict
     gmail_service = imaplib.IMAP4_SSL('imap.gmail.com')
     gmail_authorize(gmail_service)
     parse_email_list(gmail_service)
     gmail_service.logout()
-    for url in master_dict:
-        print(f'[+] URL: {url}\n{master_dict[url]}')
+    for url in output_dict:
+        print(f'[+] URL: {url}\n{output_dict[url]}')
     print_elapsed_time(start_time)
 
 
