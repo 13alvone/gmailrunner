@@ -1,57 +1,73 @@
-from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import metadata_parser
 import email.header
+import mimetypes
 import summarize
-import requests
 import datetime
-import argparse
+import requests
 import imaplib
 import logging
 import email
 import math
 import time
 import nltk
+import wget
+import uuid
+import json
 import sys
-import os
 import re
+import os
 
 # Global Variables
+root_db_dir = '/tmp/piggy/'
 gmail_email = os.environ.get('GMAIL_EMAIL')
 gmail_passwd = os.environ.get('GMAIL_PASSWD')
 gmail_folder = "INBOX"
 start_time = time.time()
-gmail_tags_path = 'gmailrunner.tags'
-master_tags = set()
+gmail_tags_path = 'cybersecurity.tags'
+global_tags = set()
 output_dict = {}
-url_block_list = [          # This is a `contains` block-list, non-explicit
+simple_summarizer = summarize.SimpleSummarizer()
+url_block_list = [                                      # This is a `contains` block-list, non-explicit
     'https://myaccount.google.com/notifications',
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    'email_address_@_to_ignore.com',
-    'other_address_@_to_ignore.com',
-    'etc@you_get_it.com',
+    '<allow_me0>@<domain0>.com',
+    '<allow_me1>@<domain1>.com',
+    '<allow_meN>@<domain2>.com'
 ]
-simple_summarizer = summarize.SimpleSummarizer()
+
+
+def save_obj(_obj):
+    global root_db_dir
+    file_name = _obj['uuid']
+    file_extension = _obj['extension'].replace('.', '')
+    file_type_dir = f'{root_db_dir}/{file_extension}'
+    if not os.path.isdir(file_type_dir):
+        os.makedirs(file_type_dir)
+    file_path = f'{file_type_dir}/{file_name}.{file_extension}'
+    wget.download(_obj['url'], file_path)
+    _obj['file_path'] = f'{file_path}'
+    return _obj
 
 
 def build_url_obj(_url):
-    global master_tags
-    meta_strategy = ['og', 'dc', 'meta', 'page']
+    global global_tags
+    meta_strategy = ['meta', 'dc', 'og']
     tags, page = [], None
     url_obj = {
+        'uuid': uuid.uuid4().hex,
+        'url': f'{_url}',
         'title': '',
         'description': '',
         'image': set(),
         'site_name': '',
-        'item_tags': {},
+        'tags': {},
+        'type': None,
+        'extension': None,
+        'file_path': None
     }
-
-    try:
-        url_obj['description'] = summarize_url_content(_url)
-    except Exception as e:
-        logging.info(f'[!] The following url failed NTLK summarization:\n{_url}\n')
 
     try:
         page = metadata_parser.MetadataParser(url=_url, search_head_only=False)
@@ -64,43 +80,76 @@ def build_url_obj(_url):
         if page and url_obj['image']:
             url_obj['image'].add(page.get_metadata_link('image'))
     except Exception as e:
-        logging.warning(e)
+        logging.info(e)
         pass
 
-    response = requests.get(_url)
-    soup = BeautifulSoup(response.text, 'lxml')
-    metas = soup.find_all('meta')
-
-    for meta in metas:
-        if 'property' in meta.attrs:
-            if 'title' in meta.attrs['property']:
-                url_obj['title'] = meta.attrs['content']
-                tags.append(meta.attrs['content'])
-            if 'image' in meta.attrs['property']:
-                url_obj['image'].add(meta.attrs['content'])
-            if 'description' in meta.attrs['property']:
-                url_obj['description'] = meta.attrs['content']
-                tags.append(meta.attrs['content'])
-            if 'site_name' in meta.attrs['property']:
-                url_obj['site_name'] = meta.attrs['content']
-                tags.append(meta.attrs['content'])
+    header_update = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 '
+                                   '(KHTML, like Gecko) Version/14.0.2 Safari/605.1.15', 'Connection':'close'}
+    response = requests.get(_url, verify=True, timeout=10, headers=header_update)
+    content_type = response.headers.get('content-type').split(';')[0]
+    extension = mimetypes.guess_extension(content_type)
+    soup = BeautifulSoup(response.text, features="lxml", parser="lxml")
+    url_obj['description'] = summarize_url_content(_url, soup)
+    url_obj['extension'] = extension
+    url_obj['type'] = content_type
+    try:
+        metas = soup.find_all('meta')
+        for meta in metas:
+            if 'property' in meta.attrs:
+                if 'title' in meta.attrs['property']:
+                    url_obj['title'] = meta.attrs['content']
+                    tags.append(meta.attrs['content'])
+                if 'image' in meta.attrs['property']:
+                    url_obj['image'].add(meta.attrs['content'])
+                if 'description' in meta.attrs['property']:
+                    if len(meta.attrs['content']) > 600:
+                        url_obj['description'] = meta.attrs['content'][:599]
+                        tags.append(meta.attrs['content'][:599])
+                    else:
+                        url_obj['description'] = meta.attrs['content']
+                        tags.append(meta.attrs['content'])
+                if 'site_name' in meta.attrs['property']:
+                    url_obj['site_name'] = meta.attrs['content']
+                    tags.append(meta.attrs['content'])
+            if ' votes and ' in url_obj['description'] and ' comments so far on ' in url_obj['description']:
+                new_description_str = ''
+                content = list(filter(None, soup.text.split('\n')))[:-1]
+                for entry in content:
+                    if 'Press J to jump to the feed' not in entry:
+                        if 'Posted by' not in entry and 'Days Ago' not in entry:
+                            for item in content:
+                                new_description_str += f' {item}'
+                            if len(new_description_str) > 1500:
+                                url_obj['description'] = new_description_str[:1499]
+                                tags.append(new_description_str[:1499])
+                            else:
+                                url_obj['description'] = new_description_str
+                                tags.append(new_description_str)
+            if url_obj['title'] == '':
+                url_obj['title'] = re.split(r'; |, |: |- |\*|\n|\r\n', url_obj['description'])[0]
+    except Exception as e:
+        logging.info(e)
+        pass
+    populate_global_tags()
     for tag_set in tags:
-        tag_up = tag_set.lstrip(' ').rstrip(' ').replace(' ', '_')
-        for tag in master_tags:
-            if tag in tag_up and tag in url_obj['item_tags']:
-                url_obj['item_tags'][tag] += 1
-            elif tag in tag_up and tag not in url_obj['item_tags']:
-                url_obj['item_tags'][tag] = 1
+        tag_up = tag_set.strip().replace('"','').replace('"', '')
+        for tag in global_tags:
+            if tag in tag_up and tag in url_obj['tags']:
+                url_obj['tags'][tag] += 1
+            elif tag in tag_up and tag not in url_obj['tags']:
+                url_obj['tags'][tag] = 1
+    if 'text/html' not in content_type:
+        url_obj = save_obj(url_obj)
+    print(f'[+] URL Built\t{_url}\n[^]\tURl Obj {url_obj}\n')
     return url_obj
 
 
-def populate_master_tags():
-    global gmail_tags_path, master_tags
-    f_in = open(_path, 'r')
+def populate_global_tags():
+    global gmail_tags_path, global_tags
+    f_in = open(gmail_tags_path, 'r')
     for line in f_in:
-        x = line.replace('\r\n', '').replace('\r', '').replace('\n', '')
-        y = x.lstrip(' ').rstrip(' ').replace(' ', '_')
-        master_tags.add(y.lower())
+        _tag = line.replace('\r\n', '').replace('\r', '').replace('\n', '').strip().lower()
+        global_tags.add(_tag)
 
 
 def print_elapsed_time(_start_time):
@@ -110,15 +159,15 @@ def print_elapsed_time(_start_time):
     if len(f'{remaining_seconds}') != 2:
         remaining_seconds = f'0{remaining_seconds}'
     elapsed_time = f'{minutes}:{remaining_seconds}'
-    time_message = f'**** Total_Time Elapsed: {elapsed_time} =======================\n\n'
+    time_message = f'[i] Total_Time Elapsed: {elapsed_time}\n'
     logging.info(time_message)
 
 
 def gmail_authorize(gmail_service):
     try:
         _return_value, _data = gmail_service.login(gmail_email, gmail_passwd)
-    except imaplib.IMAP4.error:
-        logging.warning('[!] Login Failed\n')
+    except imaplib.IMAP4.error as e:
+        logging.warning(f'[!] Login Failed\n[!] {e}\n')
         sys.exit(1)
 
 
@@ -142,6 +191,7 @@ def process_mailbox(_gmail_service):
                         message_payload = part.get_payload(decode=True).decode('utf-8')
                         url_list = re.findall(r'(https?://\S+)', message_payload)
                         for url in url_list:
+                            url = url.lstrip("'").rstrip("'")
                             is_blacklisted = 0
                             sender_approved = 0
                             for ignore_url in url_block_list:
@@ -160,19 +210,26 @@ def parse_email_list(gmail_service):
     global gmail_folder
     return_value, data = gmail_service.select(gmail_folder)
     if return_value == 'OK':
-        logging.info(f'[i] Processing mailbox: {gmail_folder}\n')
+        print(f'[i] Processing mailbox: {gmail_folder}\n')
         process_mailbox(gmail_service)
         gmail_service.close()
     else:
-        logging.warning(f'[!] Error: Unable to open mailbox `{return_value}`')
+        logging.info(f'[!] Error: Unable to open mailbox `{return_value}`')
 
 
-def summarize_url_content(_url):
+def summarize_url_content(_url, _soup):
     global simple_summarizer
-    html = urlopen(_url).read()
-    raw = nltk.clean_html(html)
-    summary = simple_summarizer.summarize(raw, 4)
+    raw = _soup.get_text()
+    raw_sentences = ' '.join(nltk.word_tokenize(raw)).replace(' .', '.')
+    summary = simple_summarizer.summarize(raw_sentences, 4)
     return summary
+
+
+def write_db_flat_file(_output_dict):
+    file_name = f'{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'
+    with open(f'{file_name}.json', 'w') as f_out:
+        json.dump(_output_dict, f_out)
+    f_out.close()
 
 
 def main():
@@ -181,8 +238,7 @@ def main():
     gmail_authorize(gmail_service)
     parse_email_list(gmail_service)
     gmail_service.logout()
-    for url in output_dict:
-        print(f'[+] URL: {url}\n{output_dict[url]}')
+    write_db_flat_file(output_dict)
     print_elapsed_time(start_time)
 
 
