@@ -20,7 +20,7 @@ import re
 import os
 
 # Global Variables
-root_db_dir = '/opt/piggylinks/'
+root_db_dir = '/tmp/piggylinks/'
 gmail_email = os.environ.get('GMAIL_EMAIL')
 gmail_passwd = os.environ.get('GMAIL_PASSWD')
 gmail_folder = "INBOX"
@@ -30,13 +30,13 @@ global_tags = set()
 output_dict = {}
 meta_strategy = ['meta', 'dc', 'og']
 simple_summarizer = summarize.SimpleSummarizer()
-url_block_list = [  # This is a `contains` block-list, non-explicit
+url_block_list = [                                  # This is a `contains` block-list, non-explicit
     'https://myaccount.google.com/notifications',
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    'email0@domain0.com',
-    'email1@domain1.com'
+    'email0@domain0',
+    'email1@domain1'
 ]
 
 
