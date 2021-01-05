@@ -1,3 +1,4 @@
+from func_timeout import func_timeout, FunctionTimedOut
 from bs4 import BeautifulSoup
 import metadata_parser
 import email.header
@@ -19,7 +20,7 @@ import re
 import os
 
 # Global Variables
-root_db_dir = '/tmp/piggy/'
+root_db_dir = '/opt/piggylinks/'
 gmail_email = os.environ.get('GMAIL_EMAIL')
 gmail_passwd = os.environ.get('GMAIL_PASSWD')
 gmail_folder = "INBOX"
@@ -27,15 +28,15 @@ start_time = time.time()
 gmail_tags_path = 'cybersecurity.tags'
 global_tags = set()
 output_dict = {}
+meta_strategy = ['meta', 'dc', 'og']
 simple_summarizer = summarize.SimpleSummarizer()
-url_block_list = [                                      # This is a `contains` block-list, non-explicit
+url_block_list = [  # This is a `contains` block-list, non-explicit
     'https://myaccount.google.com/notifications',
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    '<allow_me0>@<domain0>.com',
-    '<allow_me1>@<domain1>.com',
-    '<allow_meN>@<domain2>.com'
+    'email0@domain0.com',
+    'email1@domain1.com'
 ]
 
 
@@ -47,14 +48,36 @@ def save_obj(_obj):
     if not os.path.isdir(file_type_dir):
         os.makedirs(file_type_dir)
     file_path = f'{file_type_dir}/{file_name}.{file_extension}'
-    wget.download(_obj['url'], file_path)
+    try:
+        wget.download(_obj['url'], file_path)
+    except Exception as e:
+        with open(file_path, 'w') as f_out:
+            f_out.write(f'{_obj}\n\n')
+            f_out.write(f'{e}\n')
     _obj['file_path'] = f'{file_path}'
     return _obj
 
 
-def build_url_obj(_url):
+def parse_initial(_url_obj):
+    global meta_strategy
+    try:
+        page = metadata_parser.MetadataParser(url=_url_obj['url'], search_head_only=True)
+        if page and _url_obj['title'] != '':
+            _url_obj['title'] = page.get_metadatas('title', strategy=meta_strategy)
+        if page and _url_obj['description'] != '':
+            _url_obj['description'] = page.get_metadatas('description', strategy=meta_strategy)
+        if page and _url_obj['site_name'] != '':
+            _url_obj['site_name'] = page.get_metadatas('site_name', strategy=meta_strategy)
+        if page and _url_obj['image']:
+            _url_obj['image'].add(page.get_metadata_link('image'))
+        return _url_obj
+    except Exception as e:
+        logging.info(e)
+        return _url_obj
+
+
+def build_url_obj(_url, print_progress=True):
     global global_tags
-    meta_strategy = ['meta', 'dc', 'og']
     tags, page = [], None
     url_obj = {
         'uuid': uuid.uuid4().hex,
@@ -69,23 +92,25 @@ def build_url_obj(_url):
         'file_path': None
     }
 
+    header_update = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 '
+                                   '(KHTML, like Gecko) Version/14.0.2 Safari/605.1.15',
+                     'Connection': 'close',
+                     'Cache-Control': 'no-cache',
+                     'Pragma': 'no-cache'
+                     }
+
     try:
-        page = metadata_parser.MetadataParser(url=_url, search_head_only=False)
-        if page and url_obj['title'] != '':
-            url_obj['title'] = page.get_metadatas('title', strategy=meta_strategy)
-        if page and url_obj['description'] != '':
-            url_obj['description'] = page.get_metadatas('description', strategy=meta_strategy)
-        if page and url_obj['site_name'] != '':
-            url_obj['site_name'] = page.get_metadatas('site_name', strategy=meta_strategy)
-        if page and url_obj['image']:
-            url_obj['image'].add(page.get_metadata_link('image'))
+        _url_obj = func_timeout(30, parse_initial, args=(url_obj,))
+    except FunctionTimedOut:
+        logging.warning(f'[!] Initial Parse Timed Out!\n[-] URL: {_url}\n')
+    except Exception as e:
+        logging.warning(f'[!] Initial Parse Failed\n[-] URL: {_url}\n[-] Error: {e}\n')
+
+    try:
+        response = requests.get(_url, verify=True, timeout=20, headers=header_update)
     except Exception as e:
         logging.info(e)
-        pass
-
-    header_update = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 '
-                                   '(KHTML, like Gecko) Version/14.0.2 Safari/605.1.15', 'Connection':'close'}
-    response = requests.get(_url, verify=True, timeout=10, headers=header_update)
+        return url_obj
     content_type = response.headers.get('content-type').split(';')[0]
     extension = mimetypes.guess_extension(content_type)
     soup = BeautifulSoup(response.text, features="lxml", parser="lxml")
@@ -130,9 +155,8 @@ def build_url_obj(_url):
     except Exception as e:
         logging.info(e)
         pass
-    populate_global_tags()
     for tag_set in tags:
-        tag_up = tag_set.strip().replace('"','').replace('"', '')
+        tag_up = tag_set.strip().replace('"', '').replace('"', '')
         for tag in global_tags:
             if tag in tag_up and tag in url_obj['tags']:
                 url_obj['tags'][tag] += 1
@@ -140,7 +164,10 @@ def build_url_obj(_url):
                 url_obj['tags'][tag] = 1
     if 'text/html' not in content_type:
         url_obj = save_obj(url_obj)
-    print(f'[+] URL Built\t{_url}\n[^]\tURl Obj {url_obj}\n')
+    if print_progress:
+        msg = f'[+] URL Built\t{_url}\n[^]\tURl Obj {url_obj}\n'
+        logging.info(msg)
+        print(msg)
     return url_obj
 
 
@@ -236,6 +263,7 @@ def main():
     global start_time, gmail_folder, output_dict
     gmail_service = imaplib.IMAP4_SSL('imap.gmail.com')
     gmail_authorize(gmail_service)
+    populate_global_tags()
     parse_email_list(gmail_service)
     gmail_service.logout()
     write_db_flat_file(output_dict)
