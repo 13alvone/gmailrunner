@@ -30,13 +30,13 @@ global_tags = set()
 output_dict = {}
 meta_strategy = ['meta', 'dc', 'og']
 simple_summarizer = summarize.SimpleSummarizer()
-url_block_list = [                                  # This is a `contains` block-list, non-explicit
+url_block_list = [  # This is a `contains` block-list, non-explicit
     'https://myaccount.google.com/notifications',
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    'email0@domain0',
-    'email1@domain1'
+    'email0@domain.com',
+    'email1@domain.com'
 ]
 
 
@@ -60,20 +60,70 @@ def save_obj(_obj):
 
 def parse_initial(_url_obj):
     global meta_strategy
+    page = metadata_parser.MetadataParser(url=_url_obj['url'], search_head_only=True)
+    if page and _url_obj['title'] != '':
+        _url_obj['title'] = page.get_metadatas('title', strategy=meta_strategy)
+    if page and _url_obj['description'] != '':
+        _url_obj['description'] = page.get_metadatas('description', strategy=meta_strategy)
+    if page and _url_obj['site_name'] != '':
+        _url_obj['site_name'] = page.get_metadatas('site_name', strategy=meta_strategy)
+    if page and _url_obj['image']:
+        _url_obj['image'].add(page.get_metadata_link('image'))
+    return _url_obj
+
+
+def func_timeout_wrapper(_timeout_sec, _func_obj, _args_obj):
+    '''
+    @ _timeout_sec --> int                          # Variable Type
+    @ _func_obj --> `function_do`                   # Example string of `function_do()
+    @ _args_obj --> `Option 0` || `Option 1`        # Two `OR` Options
+        : Option 0
+        [t] tuple                                   # Type tuple continue as **kwargs is optional
+        : Option 1
+        [t] dict                                    # Type dictionary containing:
+        [^] {'args': arg_tuple(),                   # --> tuple containing positional args
+            'kwargs': kwarg_dict()                  # --> dictionary containing named args
+            }
+    '''
+
+    function_obj = {
+        'name': _func_obj.__name__,
+        'args': _args_obj,
+        'timeout': _timeout_sec,
+        'error': None,
+        'output': None
+    }
+
+    if not isinstance(_args_obj, (tuple, dict)):
+        return function_obj
+
     try:
-        page = metadata_parser.MetadataParser(url=_url_obj['url'], search_head_only=True)
-        if page and _url_obj['title'] != '':
-            _url_obj['title'] = page.get_metadatas('title', strategy=meta_strategy)
-        if page and _url_obj['description'] != '':
-            _url_obj['description'] = page.get_metadatas('description', strategy=meta_strategy)
-        if page and _url_obj['site_name'] != '':
-            _url_obj['site_name'] = page.get_metadatas('site_name', strategy=meta_strategy)
-        if page and _url_obj['image']:
-            _url_obj['image'].add(page.get_metadata_link('image'))
-        return _url_obj
+        if isinstance(_args_obj, tuple):
+            function_obj['output'] = func_timeout(timeout=_timeout_sec, func=_func_obj, args=_args_obj)
+        elif isinstance(_args_obj, dict):
+            _args = _args_obj['args']
+            _kwargs = _args_obj['kwargs']
+            function_obj['output'] = func_timeout(timeout=_timeout_sec, func=_func_obj, args=_args, kwargs=_kwargs)
+        return function_obj
+    except FunctionTimedOut:
+        function_obj['error'] = f'Timeout for function `{_func_obj}` exceeded {_timeout_sec} seconds.'
+        msg = f'[!] {function_obj["error"]}\n' \
+              f'[^] Function:\t{function_obj["name"]}\n' \
+              f'[^] Arguments:\t{function_obj["args"]}\n' \
+              f'[^] Timeout:\t{function_obj["timeout"]}\n' \
+              f'[^] Function Output:\t{function_obj["output"]}\n'
+        logging.warning(msg)
+        return function_obj
     except Exception as e:
-        logging.info(e)
-        return _url_obj
+        function_obj['error'] = f'{e}'.replace('\n', '. ')
+        msg = f'[!] General function error in function `{function_obj["name"]}`.\n' \
+              f'[^] Function:\t{function_obj["name"]}\n' \
+              f'[^] Arguments:\t{function_obj["args"]}\n' \
+              f'[^] Timeout:\t{function_obj["timeout"]}\n' \
+              f'[^] Error Details:\t{function_obj["error"]}\n' \
+              f'[^] Function Output:\t{function_obj["output"]}\n'
+        logging.info(msg)
+        return function_obj
 
 
 def build_url_obj(_url, print_progress=True):
@@ -92,31 +142,37 @@ def build_url_obj(_url, print_progress=True):
         'file_path': None
     }
 
-    header_update = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 '
-                                   '(KHTML, like Gecko) Version/14.0.2 Safari/605.1.15',
-                     'Connection': 'close',
+    header_update = {'Connection': 'close',
                      'Cache-Control': 'no-cache',
                      'Pragma': 'no-cache'
                      }
 
-    try:
-        _url_obj = func_timeout(30, parse_initial, args=(url_obj,))
-    except FunctionTimedOut:
-        logging.warning(f'[!] Initial Parse Timed Out!\n[-] URL: {_url}\n')
-    except Exception as e:
-        logging.warning(f'[!] Initial Parse Failed\n[-] URL: {_url}\n[-] Error: {e}\n')
+    url_obj = func_timeout_wrapper(30, parse_initial, (url_obj,))['output']
 
     try:
-        response = requests.get(_url, verify=True, timeout=20, headers=header_update)
+        # response = requests.get(_url, verify=True, timeout=20, headers=header_update)
+        # requests_args = ('_url', 'verify=True', 'timeout=20', 'headers=header_update')
+        request_args = {'args': (_url,),
+                        'kwargs': {
+                            'verify': True,
+                            'timeout': 30,
+                            'headers': header_update
+                        }}
+        response_obj = func_timeout_wrapper(30, requests.get, request_args)
+        if response_obj['error']:
+            return url_obj
+        response = response_obj['output']
+        content_type = response_obj['output'].headers.get('content-type')
+        if content_type and ';' in content_type:
+            content_type = content_type.split(';')[0]
+            extension = mimetypes.guess_extension(content_type)
+        soup = BeautifulSoup(response.text, features="lxml", parser="lxml")
+        url_obj['description'] = summarize_url_content(_url, soup)
+        url_obj['extension'] = extension
+        url_obj['type'] = content_type
     except Exception as e:
         logging.info(e)
         return url_obj
-    content_type = response.headers.get('content-type').split(';')[0]
-    extension = mimetypes.guess_extension(content_type)
-    soup = BeautifulSoup(response.text, features="lxml", parser="lxml")
-    url_obj['description'] = summarize_url_content(_url, soup)
-    url_obj['extension'] = extension
-    url_obj['type'] = content_type
     try:
         metas = soup.find_all('meta')
         for meta in metas:
@@ -266,7 +322,7 @@ def main():
     populate_global_tags()
     parse_email_list(gmail_service)
     gmail_service.logout()
-    write_db_flat_file(output_dict)
+    # write_db_flat_file(output_dict)
     print_elapsed_time(start_time)
 
 
