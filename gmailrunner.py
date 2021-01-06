@@ -58,6 +58,8 @@ def is_valid_url(_url):
 # Save a given `_url_obj` to file by downloading it from its given, full url.
 def save_obj(_url_obj):
     global root_db_dir
+    if not is_valid_url(_url_obj['url']):
+        return _url_obj
     file_name = _url_obj['uuid']
     file_extension = _url_obj['extension'].replace('.', '')
     file_type_dir = f'{root_db_dir}/{file_extension}'
