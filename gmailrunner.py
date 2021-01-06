@@ -21,6 +21,8 @@ import os
 
 # Global Variables
 root_db_dir = '/tmp/piggylinks/'
+global_timeout = 30
+content_length = 1600
 gmail_email = os.environ.get('GMAIL_EMAIL')
 gmail_passwd = os.environ.get('GMAIL_PASSWD')
 gmail_folder = "INBOX"
@@ -35,8 +37,8 @@ url_block_list = [  # This is a `contains` block-list, non-explicit
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    'email0@domain.com',
-    'email1@domain.com'
+    'allow_email_0@domain.com',
+    'allow_email_1@domain.com'
 ]
 
 
@@ -76,14 +78,14 @@ def func_timeout_wrapper(_timeout_sec, _func_obj, _args_obj):
     '''
     @ _timeout_sec --> int                          # Variable Type
     @ _func_obj --> `function_do`                   # Example string of `function_do()
-    @ _args_obj --> `Option 0` || `Option 1`        # Two `OR` Options
+    @ _args_obj --> `Option 0` || `Option 1`        # Two options of input available
         : Option 0
-        [t] tuple                                   # Type tuple continue as **kwargs is optional
+            [t] tuple                               # Type tuple input, **kwargs is optional
         : Option 1
-        [t] dict                                    # Type dictionary containing:
-        [^] {'args': arg_tuple(),                   # --> tuple containing positional args
-            'kwargs': kwarg_dict()                  # --> dictionary containing named args
-            }
+            [t] dict                                # Type dictionary input containing:
+            [^] {'args': arg_tuple(),               # --> tuple containing positional args
+                'kwargs': kwarg_dict()              # --> dictionary containing named args
+                }
     '''
 
     function_obj = {
@@ -127,7 +129,7 @@ def func_timeout_wrapper(_timeout_sec, _func_obj, _args_obj):
 
 
 def build_url_obj(_url, print_progress=True):
-    global global_tags
+    global global_tags, global_timeout, content_length
     tags, page = [], None
     url_obj = {
         'uuid': uuid.uuid4().hex,
@@ -147,18 +149,16 @@ def build_url_obj(_url, print_progress=True):
                      'Pragma': 'no-cache'
                      }
 
-    url_obj = func_timeout_wrapper(30, parse_initial, (url_obj,))['output']
+    url_obj = func_timeout_wrapper(global_timeout, parse_initial, (url_obj,))['output']
 
     try:
-        # response = requests.get(_url, verify=True, timeout=20, headers=header_update)
-        # requests_args = ('_url', 'verify=True', 'timeout=20', 'headers=header_update')
         request_args = {'args': (_url,),
                         'kwargs': {
                             'verify': True,
                             'timeout': 30,
                             'headers': header_update
                         }}
-        response_obj = func_timeout_wrapper(30, requests.get, request_args)
+        response_obj = func_timeout_wrapper(global_timeout, requests.get, request_args)
         if response_obj['error']:
             return url_obj
         response = response_obj['output']
@@ -166,64 +166,71 @@ def build_url_obj(_url, print_progress=True):
         if content_type and ';' in content_type:
             content_type = content_type.split(';')[0]
             extension = mimetypes.guess_extension(content_type)
+            url_obj['extension'] = extension
         soup = BeautifulSoup(response.text, features="lxml", parser="lxml")
         url_obj['description'] = summarize_url_content(_url, soup)
-        url_obj['extension'] = extension
         url_obj['type'] = content_type
+
+        # Tag on any additional information found from within `property` metadata
+        metas = soup.find_all('meta')
+        for meta in metas:
+            if 'property' in meta.attrs and 'title' in meta.attrs['property']:
+                url_obj['title'] = meta.attrs['content']
+                tags.append(meta.attrs['content'])
+            if 'property' in meta.attrs and 'image' in meta.attrs['property']:
+                url_obj['image'].add(meta.attrs['content'])
+            if 'property' in meta.attrs and 'description' in meta.attrs['property']:
+                if len(meta.attrs['content']) > content_length:
+                    url_obj['description'] = meta.attrs['content'][:content_length-1]
+                    tags.append(meta.attrs['content'][:content_length-1])
+                else:
+                    url_obj['description'] = meta.attrs['content']
+                    tags.append(meta.attrs['content'])
+            if 'property' in meta.attrs and 'site_name' in meta.attrs['property']:
+                url_obj['site_name'] = meta.attrs['content']
+                tags.append(meta.attrs['content'])
+
+        if ' votes and ' in url_obj['description'] and ' comments so far on ' in url_obj['description']:
+            new_description_str = ''
+            content = list(filter(None, soup.text.split('\n')))[:-1]
+            _continue = True
+            for entry in content:
+                if ('Press J to jump to the feed' in entry) or ('Posted by' in entry and 'Days Ago' in entry):
+                    _continue = False
+                if _continue:
+                    new_description_str += f' {entry}'
+            if len(new_description_str) > content_length:
+                url_obj['description'] = new_description_str[:content_length-1]
+                tags.append(new_description_str[:content_length-1])
+            else:
+                url_obj['description'] = new_description_str
+                tags.append(new_description_str)
+
+        if url_obj['title'] == '':
+            url_obj['title'] = re.split(r'; |, |: |- |\*|\n|\r\n', url_obj['description'])[0]
+
+        full_content = ' '.join(tags)
+        for tag in global_tags:
+            if tag in full_content and tag in url_obj['tags']:
+                url_obj['tags'][tag] += 1
+            elif tag in full_content and tag not in url_obj['tags']:
+                url_obj['tags'][tag] = 1
+        for tag_set in tags:
+            tag_up = tag_set.strip().replace('"', '').replace('"', '')
+            for tag in global_tags:
+                if tag in tag_up and tag in url_obj['tags']:
+                    url_obj['tags'][tag] += 1
+                elif tag in tag_up and tag not in url_obj['tags']:
+                    url_obj['tags'][tag] = 1
+        if 'text/html' not in content_type:
+            url_obj = save_obj(url_obj)
+        if print_progress:
+            msg = f'[+] URL Built\t{_url}\n[^]\tURl Obj {url_obj}\n'
+            logging.info(msg)
+            print(msg)
     except Exception as e:
         logging.info(e)
         return url_obj
-    try:
-        metas = soup.find_all('meta')
-        for meta in metas:
-            if 'property' in meta.attrs:
-                if 'title' in meta.attrs['property']:
-                    url_obj['title'] = meta.attrs['content']
-                    tags.append(meta.attrs['content'])
-                if 'image' in meta.attrs['property']:
-                    url_obj['image'].add(meta.attrs['content'])
-                if 'description' in meta.attrs['property']:
-                    if len(meta.attrs['content']) > 600:
-                        url_obj['description'] = meta.attrs['content'][:599]
-                        tags.append(meta.attrs['content'][:599])
-                    else:
-                        url_obj['description'] = meta.attrs['content']
-                        tags.append(meta.attrs['content'])
-                if 'site_name' in meta.attrs['property']:
-                    url_obj['site_name'] = meta.attrs['content']
-                    tags.append(meta.attrs['content'])
-            if ' votes and ' in url_obj['description'] and ' comments so far on ' in url_obj['description']:
-                new_description_str = ''
-                content = list(filter(None, soup.text.split('\n')))[:-1]
-                for entry in content:
-                    if 'Press J to jump to the feed' not in entry:
-                        if 'Posted by' not in entry and 'Days Ago' not in entry:
-                            for item in content:
-                                new_description_str += f' {item}'
-                            if len(new_description_str) > 1500:
-                                url_obj['description'] = new_description_str[:1499]
-                                tags.append(new_description_str[:1499])
-                            else:
-                                url_obj['description'] = new_description_str
-                                tags.append(new_description_str)
-            if url_obj['title'] == '':
-                url_obj['title'] = re.split(r'; |, |: |- |\*|\n|\r\n', url_obj['description'])[0]
-    except Exception as e:
-        logging.info(e)
-        pass
-    for tag_set in tags:
-        tag_up = tag_set.strip().replace('"', '').replace('"', '')
-        for tag in global_tags:
-            if tag in tag_up and tag in url_obj['tags']:
-                url_obj['tags'][tag] += 1
-            elif tag in tag_up and tag not in url_obj['tags']:
-                url_obj['tags'][tag] = 1
-    if 'text/html' not in content_type:
-        url_obj = save_obj(url_obj)
-    if print_progress:
-        msg = f'[+] URL Built\t{_url}\n[^]\tURl Obj {url_obj}\n'
-        logging.info(msg)
-        print(msg)
     return url_obj
 
 
