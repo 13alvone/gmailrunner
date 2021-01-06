@@ -25,10 +25,8 @@ import os
 root_db_dir = '~/piggylinks/'
 global_timeout = 30
 content_length = 1600
-# gmail_email = os.environ.get('GMAIL_EMAIL')
-# gmail_passwd = os.environ.get('GMAIL_PASSWD')
-gmail_email = 'cspeakesinfo@gmail.com'
-gmail_passwd = 'Snakeinmyboots!$$'
+gmail_email = os.environ.get('GMAIL_EMAIL')
+gmail_passwd = os.environ.get('GMAIL_PASSWD')
 gmail_folder = "INBOX"
 start_time = time.time()
 gmail_tags_path = 'cybersecurity.tags'
@@ -41,8 +39,8 @@ url_block_list = [  # This is a `contains` block-list, non-explicit
     'https://accounts.google.com/AccountChooser',
 ]
 sender_allow_list = [
-    'cspeakesinfo@gmail.com',
-    'cspeakes@gmail.com'
+    'allow_email_0@domain.com',
+    'allow_email_1@domain.com'
 ]
 
 
