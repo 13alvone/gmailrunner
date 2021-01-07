@@ -158,7 +158,7 @@ def build_url_obj(_url, print_progress=True):
     url_obj = {
         'uuid': uuid.uuid4().hex,
         'url': f'{_url}',
-        'title': None,
+        'title': '',
         'description': None,
         'image': set(),
         'site_name': None,
