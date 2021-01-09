@@ -5,11 +5,9 @@ wireless
 full disk encryption
 sysadmin audit network security institute
 personal identification number
-irm
 chief information officer
 boot camp
 icmp
-abi
 address space layout randomization
 wi-fi protected access
 exposure factor
@@ -19,11 +17,9 @@ virtual desktop infrastructure
 blind carbon copy
 dynamic trunking protocol (cisco)
 rat
-ir
 algorithms
 harden
 sql injection
-dc
 remote execute
 c-sharp
 server side encryption
@@ -43,17 +39,15 @@ distributed denial of service
 aes
 csirt
 tactics, techniques, and procedures
-fud
-ttd
+ttp
 rpc
 vulnerability assessment and penetration test
 internet service provider
+isp
 amazon elastic block store
 cloud-based security providers
 powershell
 ept
-ace
-cc
 mario
 sasl
 sec566
@@ -116,10 +110,12 @@ nop
 system on a chip
 multi-factor authentication
 mitm
+mfa
+nfs
 network file system
 cuckoo
 clean desk policy
-pop
+pop3
 certification
 certified information systems security professional
 geospatial intelligence
@@ -132,10 +128,10 @@ in-depth
 long-term evolution
 new technology lan manager (windows)
 message of the day banner
-irp
+motd
 2-factor authentication
 time-of-check to time-of-use (race condition)
-mvp
+mfa
 sme
 direct message
 c++ programming
@@ -144,11 +140,11 @@ persec
 cyber threat intelligence
 wide area network
 wap
-ti
 pcap
 server side includes
 health insurance portability accountability act
 rmf
+irl
 in real life
 garbage collection
 binary large object
@@ -157,49 +153,53 @@ dfir
 offensive security
 otx
 osx
+cyber
 ctp
 isac
+otp
 one-time password
 ssl
 problem exists between chair and keyboard
+pebcak
 lts
 sts
-sans 617
+sans
 qsa
 open services gateway initiative
 network forensics
-irl
 internet of things
-fysa
+iot
 cascading style sheets
 stig
 java cryptography extension
+cryptography
+java
+rpc
 remote procedure call
+guid
 globally unique identifier
 cross-site request forgery
-cde
-sast
-csprng
-ups
+csrf
 pcre
 penetration test
 information disclosure
 csharp
 virtual private lan service
 offensive security certified expert
-cic
-heads
+osce
+oscp
+offensive security certified professional
+vpc
 day2-demos
 ctf
 netbios name service
 reverse-engineer
+reverse engineer
 data protection impact assessment
-dtp
 waf
-mimimum viable product (the smallest, simplest thing that meets the criteria)
-dn
+mimimum viable product
+mvp
 pebcak
-sse
 dma
 ctops
 second-level domain
@@ -208,33 +208,38 @@ pwk
 single board computer
 mac osx
 xmpp
+nda
 non-disclosure agreement
 process for attack simulation and threat analysis
 rbac
-survival
 network level authentication
-noc
+nla
 vdi
+vps
 virtual private server
 national institute of science & technology
 csrf
 local security authority subsystem service
 mpls
+lsass
 virtual private network
+vpn
 grc
 bro
 request for proposal
+rfp
 secure shell
+ssh
 spf
 socks
 personal area network
 cbc
 unpacker
 open threat exchange
+ote
 data structures
 wireless hacking
 tls
-build
 specterops
 dmarc
 fully qualified domain name
@@ -242,6 +247,8 @@ common weakness enumeration
 common vulnerability scoring system
 statement of work
 advanced encryption standard
+aes
+pki
 public key infrastructure
 security operations center as a service
 nac
@@ -252,7 +259,9 @@ virtual
 zt
 rfi
 privilege escalation
+privesc
 http parameter pollution
+http pollution
 rto
 the onion router
 kill chain
@@ -261,9 +270,9 @@ mra
 udp
 idor
 common vulnerabilities and exposures
+cve
+cvss
 rexec
-swre
-phr
 dos
 unified communications
 cross-origin resource sharing
@@ -272,21 +281,21 @@ exploitation techniques
 opsec
 exercise
 open web application security project
+owasp
 fqdn
 plugins
 data processing agreement
 security orchestration, automation and response
 direct memory access
-privesc
 primary account number
 gdpr
-lamp
 vulnerability management
 emr
 tkip
 smb
 msct
 local file inclusion
+lfi
 packet capture
 autonomous system number
 cro
@@ -298,6 +307,7 @@ multipurpose internet mail extensions
 dns
 wireless access point
 acceptable use policy
+aup
 jmx
 xhr
 procedure-oriented programming
@@ -311,6 +321,7 @@ apple
 next generation firewall
 industrial control system
 md5
+ics
 situational awareness
 for your situational awareness
 nips
@@ -331,11 +342,13 @@ antivirus test file
 teb
 for your information
 giac
+fyi
 soap
 session border controller
 internet key exchange
 structured exception handling
 basic service set identifier
+bssid
 cryptography
 primitive
 for508
@@ -356,11 +369,13 @@ irc
 gpg
 application programming interface
 os x
+api
 css
 ewil twin attack (wi-fi)
 uniform / universal resource name
 session traversal utilities for nat
 atp
+evil twin
 protected health information
 lfi
 software composition analysis
@@ -481,7 +496,6 @@ crud
 credit cards (carding fraud)
 encapsulation
 certified ethical hacker
-uc
 start of authority
 governance, risk and compliance
 application server
@@ -544,10 +558,10 @@ representational state transfer web services
 sans 760 - advanced exploit development
 no operation
 constructor
-ms
 apk
 shimcache
 rba
+bua
 business as usual
 red team operations
 approved scanning vendors
@@ -561,7 +575,6 @@ network operations centre
 gwt
 perl-compatible regular expressions
 single sign-on
-pt
 poe
 network penetration testing
 application security
@@ -571,7 +584,6 @@ content security policy
 asn
 vpn
 eff
-cve
 dynamic application security testing
 pld
 osce
@@ -580,9 +592,13 @@ content management system
 cgi
 virtual private routed network
 jvm
+rto
 recovery time objective
-information system owner (in rmf – risk management framework)
+information system owner
+risk management framework
+rmf
 sbc
+hmac
 hash-based message authentication code.
 ipmi
 remote administration tool
@@ -616,12 +632,10 @@ radio frequency identification (card)
 digital forensics
 source code disclosure
 information security manual
-qr
 cryptographically secure pseudo-random number generator
 hex
 sans sec566
 sdn
-tor
 firewall
 tools, techniques, & procedures
 cross-site websocket hijacking
@@ -630,7 +644,7 @@ software development lifecycle
 sans 531
 system center configuration manager
 rcp
-dr
+disaster recovery
 reverse engineering
 thread environment block
 dde
@@ -701,6 +715,10 @@ click-through rate
 network address translation
 csv
 ssp
+youtube
+reddit
+blue team
+woodworking
 time to detection
 wids
 prng
@@ -802,12 +820,14 @@ vscode
 off-by-one error
 customer relations management
 ntlm
-information technology
+information tech
 access point
-rca
 hmac
 wordlist
+word list
 pcidss
+pci/dss
+pci-dss
 annualized loss expectancy
 gnu privacy guard
 global system for mobile (communications)
@@ -821,16 +841,15 @@ simple authentication and security layer
 iast
 dcom
 forensics
-rivest-shamir-adleman (encryption)
+rivest-shamir-adleman
+rivest
+shamir
 plex
-exclusive or (encryption)
 crc
 denial of service
-binding corporate rules (for intra group data transfers)
+binding corporate rules
 sha
 network access control
-iar
-ueba
 california’s consumer privacy act
 guid
 quick response code
@@ -843,7 +862,6 @@ dpia
 windows exploitation
 cctv
 nmap
-ale
 supervisory control and data acquisition
 stun
 disaster recovery
@@ -958,7 +976,7 @@ utms
 cdma
 transmission control protocol
 windows, apache, mysql, and php
-ad
+active directory
 oswe
 mime
 course
@@ -973,7 +991,9 @@ vulnerability
 sysconfig
 jsbeautifier
 nbns
+virtual machine
 vm
+pii
 message queue
 personally identifiable infomation
 cyber course

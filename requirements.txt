@@ -24,3 +24,5 @@ tqdm==4.55.1
 urllib3==1.26.2
 validators==0.18.2
 wget==3.2
+
+tld~=0.12.4
